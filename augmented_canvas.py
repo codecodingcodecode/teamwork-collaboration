@@ -1,11 +1,15 @@
 import cv2
 import numpy as np
+import math
 
 class AugmentedCanvas:
     def __init__(self):
         self.canvas_width = 640
         self.canvas_height = 480
         self.detected_objects = []
+        self.proximity_threshold = 150  # Distance in pixels for clustering
+        self.base_flower_size = 20      # Base flower size
+        self.max_flower_size = 60       # Maximum flower size
         
     def detect_paper_objects(self, gray_frame):
         # Simple threshold to detect bright objects (white paper)
@@ -34,6 +38,34 @@ class AugmentedCanvas:
         
         return objects
     
+    def calculate_distance(self, point1, point2):
+        """Calculate Euclidean distance between two points"""
+        return math.sqrt((point1[0] - point2[0])**2 + (point1[1] - point2[1])**2)
+    
+    def count_nearby_notes(self, target_obj, all_objects):
+        """Count how many notes are within proximity threshold of the target object"""
+        nearby_count = 0
+        target_center = target_obj['center']
+        
+        for obj in all_objects:
+            if obj != target_obj:  # Don't count itself
+                distance = self.calculate_distance(target_center, obj['center'])
+                if distance <= self.proximity_threshold:
+                    nearby_count += 1
+        
+        return nearby_count
+    
+    def calculate_flower_size(self, note_obj, all_objects):
+        """Calculate flower size based on nearby notes clustering"""
+        nearby_count = self.count_nearby_notes(note_obj, all_objects)
+        
+        # Scale flower size based on cluster density
+        # More nearby notes = bigger flower
+        size_multiplier = 1 + (nearby_count * 0.5)  # Each nearby note adds 50% to size
+        new_size = min(self.base_flower_size * size_multiplier, self.max_flower_size)
+        
+        return int(new_size)
+    
     def draw_flower(self, canvas, center, size=20):
         x, y = center
         
@@ -61,19 +93,35 @@ class AugmentedCanvas:
     def create_canvas(self, detected_objects, frame_shape):
         canvas = np.zeros((frame_shape[0], frame_shape[1], 3), dtype=np.uint8)
         
+        # First, draw connection lines between clustered notes
+        for i, obj1 in enumerate(detected_objects):
+            if obj1['type'] == 'paper':
+                for obj2 in detected_objects[i+1:]:
+                    if obj2['type'] == 'paper':
+                        distance = self.calculate_distance(obj1['center'], obj2['center'])
+                        if distance <= self.proximity_threshold:
+                            # Draw a subtle connection line
+                            cv2.line(canvas, obj1['center'], obj2['center'], 
+                                   (100, 100, 100), 1)  # Gray connection line
+        
+        # Then draw flowers with dynamic sizing
         for obj in detected_objects:
             if obj['type'] == 'paper':
                 # Map camera position to canvas position
                 canvas_x = obj['center'][0]
                 canvas_y = obj['center'][1]
                 
-                # Draw flower at object position
-                self.draw_flower(canvas, (canvas_x, canvas_y))
+                # Calculate dynamic flower size based on nearby notes
+                flower_size = self.calculate_flower_size(obj, detected_objects)
+                nearby_count = self.count_nearby_notes(obj, detected_objects)
                 
-                # Add object info text
-                cv2.putText(canvas, f"Paper", 
+                # Draw flower at object position with dynamic size
+                self.draw_flower(canvas, (canvas_x, canvas_y), flower_size)
+                
+                # Add object info text with cluster info
+                cv2.putText(canvas, f"Note (Cluster: {nearby_count + 1})", 
                            (obj['bbox'][0], obj['bbox'][1] - 10),
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
         
         return canvas
 
