@@ -225,10 +225,18 @@ def main():
     print("Controls:")
     print("- SPACE: Start timer and visualization")
     print("- ESC: Stop and exit")
-    print("- F: Toggle fullscreen")
     print("- Q: Quit")
     
-    window_name = 'Augmented Reality Canvas'
+    camera_window = 'Camera Feed'
+    canvas_window = 'Augmented Canvas'
+    
+    # Create named windows
+    cv2.namedWindow(camera_window, cv2.WINDOW_NORMAL)
+    cv2.namedWindow(canvas_window, cv2.WINDOW_NORMAL)
+    
+    # Position windows side by side
+    cv2.moveWindow(camera_window, 100, 100)
+    cv2.moveWindow(canvas_window, 750, 100)
     
     while True:
         ret, frame = cap.read()
@@ -241,41 +249,28 @@ def main():
         # Detect objects in the frame
         detected_objects = augmented_canvas.detect_paper_objects(gray)
         
+        # Create camera display with bounding boxes and info
+        camera_display = frame.copy()
+        
+        # Add label to camera feed
+        cv2.putText(camera_display, "Camera Feed", (10, 30), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+        cv2.putText(camera_display, f"Objects: {len(detected_objects)}", (10, camera_display.shape[0] - 20), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+        
+        # Draw bounding boxes on camera feed
+        for obj in detected_objects:
+            x, y, w, h = obj['bbox']
+            cv2.rectangle(camera_display, (x, y), (x+w, y+h), (0, 255, 0), 2)
+        
         # Create canvas with overlays
         canvas = augmented_canvas.create_canvas(detected_objects, gray.shape)
         
-        # Choose display mode
-        if augmented_canvas.fullscreen:
-            # Fullscreen mode - show only canvas
-            display = canvas
-            height, width = canvas.shape[:2]
-        else:
-            # Split screen mode
-            height, width = frame.shape[:2]
-            display = np.zeros((height, width * 2, 3), dtype=np.uint8)
-            
-            # Original color feed
-            display[:height, :width] = frame
-            
-            # Augmented canvas
-            display[:height, width:] = canvas
-            
-            # Add labels and object count
-            cv2.putText(display, "Camera Feed", (10, 30), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-            cv2.putText(display, "Augmented Canvas", (width + 10, 30), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-            cv2.putText(display, f"Objects: {len(detected_objects)}", (10, height - 20), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-            
-            # Draw bounding boxes on camera feed
-            for obj in detected_objects:
-                x, y, w, h = obj['bbox']
-                cv2.rectangle(display[:height, :width], (x, y), (x+w, y+h), (0, 255, 0), 2)
+        # Show both windows
+        cv2.imshow(camera_window, camera_display)
+        cv2.imshow(canvas_window, canvas)
         
-        cv2.imshow(window_name, display)
-        
-        # Handle key presses
+        # Handle key presses from either window
         key = cv2.waitKey(1) & 0xFF
         
         if key == ord('q'):
@@ -286,12 +281,6 @@ def main():
         elif key == 27:  # ESC key
             if augmented_canvas.is_running:
                 break  # Stop and exit
-        elif key == ord('f'):  # F key
-            augmented_canvas.fullscreen = not augmented_canvas.fullscreen
-            if augmented_canvas.fullscreen:
-                cv2.setWindowProperty(window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
-            else:
-                cv2.setWindowProperty(window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_NORMAL)
         
         # Check if timer expired
         if augmented_canvas.is_running and augmented_canvas.is_timer_expired():
