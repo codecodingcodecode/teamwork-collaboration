@@ -549,7 +549,40 @@ class AugmentedCanvas:
             cv2.putText(canvas, discussion_text, (text_x, frame_shape[0] // 2), 
                        cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 0), 3)
         
-        # Show flowers if timer is running or has expired
+        # Count post-its by color for display
+        color_counts = {'pink': 0, 'yellow': 0, 'blue': 0, 'green': 0}
+        for obj in detected_objects:
+            if obj['type'] == 'postit':
+                color_counts[obj['color']] += 1
+        
+        # Display color counts in bottom-left corner (small)
+        start_x = 20
+        start_y = frame_shape[0] - 100  # Start from bottom and work up
+        y_offset = 0
+        
+        for color, count in color_counts.items():
+            if count > 0:  # Only show colors that have post-its
+                # Determine display color (BGR format for OpenCV)
+                if color == 'pink':
+                    text_color = (255, 0, 255)    # Magenta
+                elif color == 'yellow':
+                    text_color = (0, 255, 255)    # Cyan
+                elif color == 'blue':
+                    text_color = (255, 0, 0)      # Blue
+                elif color == 'green':
+                    text_color = (0, 255, 0)      # Green
+                else:
+                    text_color = (255, 255, 255)  # White
+                
+                # Draw small colored circle and count
+                circle_x = start_x
+                circle_y = start_y + y_offset
+                cv2.circle(canvas, (circle_x, circle_y), 6, text_color, -1)
+                cv2.putText(canvas, f"{count}", (circle_x + 15, circle_y + 5), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, text_color, 1)
+                y_offset += 20
+        
+        # Show flowers/rings if timer is running or has expired
         if self.is_running or self.timer_expired:
             # Group post-its into clusters using simple fixed distance
             clusters = self.group_postits_into_clusters(detected_objects)
