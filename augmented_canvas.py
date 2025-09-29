@@ -38,16 +38,22 @@ class AugmentedCanvas:
         blue_lower = np.array([90, 50, 50])
         blue_upper = np.array([130, 255, 255])
         
+        # Green post-its (broader range)
+        green_lower = np.array([35, 50, 50])
+        green_upper = np.array([85, 255, 255])
+        
         # Create masks for each color
         pink_mask1 = cv2.inRange(hsv, pink_lower1, pink_upper1)
         pink_mask2 = cv2.inRange(hsv, pink_lower2, pink_upper2)
         pink_mask = cv2.bitwise_or(pink_mask1, pink_mask2)  # Combine pink ranges
         yellow_mask = cv2.inRange(hsv, yellow_lower, yellow_upper)
         blue_mask = cv2.inRange(hsv, blue_lower, blue_upper)
+        green_mask = cv2.inRange(hsv, green_lower, green_upper)
         
         # Combine all masks
         combined_mask = cv2.bitwise_or(pink_mask, yellow_mask)
         combined_mask = cv2.bitwise_or(combined_mask, blue_mask)
+        combined_mask = cv2.bitwise_or(combined_mask, green_mask)
         
         # Clean up the mask with morphological operations
         # Use smaller kernel to avoid merging separate post-its
@@ -101,13 +107,11 @@ class AugmentedCanvas:
                                 pink_pixels = np.sum(cv2.inRange(roi, pink_lower1, pink_upper1)) + np.sum(cv2.inRange(roi, pink_lower2, pink_upper2))
                                 yellow_pixels = np.sum(cv2.inRange(roi, yellow_lower, yellow_upper))
                                 blue_pixels = np.sum(cv2.inRange(roi, blue_lower, blue_upper))
+                                green_pixels = np.sum(cv2.inRange(roi, green_lower, green_upper))
                                 
-                                if pink_pixels > yellow_pixels and pink_pixels > blue_pixels:
-                                    color = 'pink'
-                                elif yellow_pixels > blue_pixels:
-                                    color = 'yellow'
-                                else:
-                                    color = 'blue'
+                                # Find the color with the most matching pixels
+                                color_counts = {'pink': pink_pixels, 'yellow': yellow_pixels, 'blue': blue_pixels, 'green': green_pixels}
+                                color = max(color_counts, key=color_counts.get)
                                 
                                 objects.append({
                                     'type': 'postit',
@@ -127,14 +131,11 @@ class AugmentedCanvas:
                         pink_pixels = np.sum(cv2.inRange(roi, pink_lower1, pink_upper1)) + np.sum(cv2.inRange(roi, pink_lower2, pink_upper2))
                         yellow_pixels = np.sum(cv2.inRange(roi, yellow_lower, yellow_upper))
                         blue_pixels = np.sum(cv2.inRange(roi, blue_lower, blue_upper))
+                        green_pixels = np.sum(cv2.inRange(roi, green_lower, green_upper))
                         
                         # Choose the color with the most matching pixels
-                        if pink_pixels > yellow_pixels and pink_pixels > blue_pixels:
-                            color = 'pink'
-                        elif yellow_pixels > blue_pixels:
-                            color = 'yellow'
-                        else:
-                            color = 'blue'
+                        color_counts = {'pink': pink_pixels, 'yellow': yellow_pixels, 'blue': blue_pixels, 'green': green_pixels}
+                        color = max(color_counts, key=color_counts.get)
                         
                         objects.append({
                             'type': 'postit',
@@ -149,6 +150,7 @@ class AugmentedCanvas:
             'pink': pink_mask,
             'yellow': yellow_mask, 
             'blue': blue_mask,
+            'green': green_mask,
             'combined': combined_mask
         }
         
@@ -414,11 +416,26 @@ class AugmentedCanvas:
             self.is_running = False
         return self.timer_expired
     
-    def draw_flower(self, canvas, center, size=20, petal_count=1):
+    def draw_flower(self, canvas, center, size=20, petal_count=1, cluster_colors=None):
         x, y = center
         
         # Define colors (BGR format for OpenCV)
-        petal_color = (147, 20, 255)    # Purple petals
+        if cluster_colors and len(cluster_colors) > 0:
+            # Use the most common post-it color in the cluster for petals
+            most_common_color = max(set(cluster_colors), key=cluster_colors.count)
+            if most_common_color == 'pink':
+                petal_color = (255, 0, 255)    # Magenta for pink post-its
+            elif most_common_color == 'yellow':
+                petal_color = (0, 255, 255)    # Cyan for yellow post-its
+            elif most_common_color == 'blue':
+                petal_color = (255, 0, 0)      # Blue for blue post-its
+            elif most_common_color == 'green':
+                petal_color = (0, 255, 0)      # Green for green post-its
+            else:
+                petal_color = (147, 20, 255)   # Default purple
+        else:
+            petal_color = (147, 20, 255)       # Default purple petals
+            
         center_color = (0, 255, 255)    # Yellow center  
         stem_color = (0, 255, 0)        # Green stem
         
@@ -506,8 +523,11 @@ class AugmentedCanvas:
                 base_size = 25
                 flower_size = min(base_size + (petal_count - 1) * 5, self.max_flower_size)
                 
-                # Draw flower at cluster center
-                self.draw_flower(canvas, cluster_center, flower_size, petal_count)
+                # Collect colors from all post-its in this cluster
+                cluster_colors = [postit['color'] for postit in cluster]
+                
+                # Draw flower at cluster center with cluster colors
+                self.draw_flower(canvas, cluster_center, flower_size, petal_count, cluster_colors)
                 
                 # Debug: show cluster info if debug mode is on
                 if self.show_debug:
@@ -705,11 +725,11 @@ def main():
         cv2.putText(camera_display, "Camera Feed", (10, 30), 
                    cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
         # Count post-its by color for debug info
-        color_counts = {'pink': 0, 'yellow': 0, 'blue': 0}
+        color_counts = {'pink': 0, 'yellow': 0, 'blue': 0, 'green': 0}
         for obj in detected_objects:
             color_counts[obj['color']] += 1
         
-        cv2.putText(camera_display, f"Post-its: {len(detected_objects)} (P:{color_counts['pink']} Y:{color_counts['yellow']} B:{color_counts['blue']})", 
+        cv2.putText(camera_display, f"Post-its: {len(detected_objects)} (P:{color_counts['pink']} Y:{color_counts['yellow']} B:{color_counts['blue']} G:{color_counts['green']})", 
                    (10, camera_display.shape[0] - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
         
         # Draw bounding boxes on camera feed with color coding
@@ -722,8 +742,10 @@ def main():
                 box_color = (0, 255, 255)  # Cyan for yellow
             elif obj['color'] == 'blue':
                 box_color = (255, 0, 0)    # Blue
+            elif obj['color'] == 'green':
+                box_color = (0, 255, 0)    # Green
             else:
-                box_color = (0, 255, 0)    # Green default
+                box_color = (255, 255, 255)  # White default
             
             cv2.rectangle(camera_display, (x, y), (x+w, y+h), box_color, 2)
             # Add color label
@@ -746,16 +768,18 @@ def main():
             debug_display[:, :frame.shape[1], 1] = augmented_canvas.debug_masks['combined'] 
             debug_display[:, :frame.shape[1], 2] = augmented_canvas.debug_masks['combined']
             
-            # Right side: individual color masks
-            h = frame.shape[0] // 3
+            # Right side: individual color masks (4 colors now, so divide into quarters)
+            h = frame.shape[0] // 4
             debug_display[:h, frame.shape[1]:, 0] = augmented_canvas.debug_masks['pink'][:h, :]  # Pink in red channel
             debug_display[h:2*h, frame.shape[1]:, 1] = augmented_canvas.debug_masks['yellow'][h:2*h, :]  # Yellow in green
-            debug_display[2*h:, frame.shape[1]:, 2] = augmented_canvas.debug_masks['blue'][2*h:, :]  # Blue in blue
+            debug_display[2*h:3*h, frame.shape[1]:, 2] = augmented_canvas.debug_masks['blue'][2*h:3*h, :]  # Blue in blue
+            debug_display[3*h:, frame.shape[1]:, 1] = augmented_canvas.debug_masks['green'][3*h:, :]  # Green in green
             
             cv2.putText(debug_display, "Combined Mask", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
             cv2.putText(debug_display, "Pink Mask", (frame.shape[1] + 10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
             cv2.putText(debug_display, "Yellow Mask", (frame.shape[1] + 10, h + 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
             cv2.putText(debug_display, "Blue Mask", (frame.shape[1] + 10, 2*h + 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
+            cv2.putText(debug_display, "Green Mask", (frame.shape[1] + 10, 3*h + 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
             
             cv2.imshow("Color Debug", debug_display)
         
