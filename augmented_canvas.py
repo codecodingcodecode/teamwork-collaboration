@@ -18,6 +18,7 @@ class AugmentedCanvas:
         self.timer_expired = False
         self.show_debug = False
         self.fullscreen = False
+        self.design_style = 'flowers'  # 'flowers' or 'rings'
         
     def detect_postit_objects(self, color_frame):
         # Convert BGR to HSV for better color detection
@@ -366,7 +367,7 @@ class AugmentedCanvas:
             return available_cameras[0]
     
     def get_user_input(self):
-        """Get question and timer duration from user via console"""
+        """Get question, timer duration, and design style from user via console"""
         print("\n=== Augmented Canvas Setup ===")
         
         try:
@@ -383,16 +384,30 @@ class AugmentedCanvas:
             except ValueError:
                 print("Invalid timer input, using default 60 seconds")
                 timer_duration = 60
+                
+            # Get design style
+            print("\nDesign styles:")
+            print("1. Flowers (petals represent clustered post-its)")
+            print("2. Rings (concentric rings represent clustered post-its)")
+            design_input = input("Choose design style (1 for flowers, 2 for rings, default 1): ").strip()
+            if design_input == "2":
+                design_style = 'rings'
+            else:
+                design_style = 'flowers'
+                
         except EOFError:
             # If running in environment without interactive input, use defaults
             print("Using default values...")
             question = "What do you think about this?"
             timer_duration = 60
+            design_style = 'flowers'
             
         self.question = question
         self.timer_duration = timer_duration
+        self.design_style = design_style
         print(f"Question: {self.question}")
         print(f"Timer: {self.timer_duration} seconds")
+        print(f"Design: {self.design_style}")
         return True
     
     def start_timer(self):
@@ -476,6 +491,41 @@ class AugmentedCanvas:
         stem_thickness = max(2, min(petal_count, 6))
         cv2.line(canvas, (x, y + center_size), (x, y + size * 2), stem_color, stem_thickness)
     
+    def draw_rings(self, canvas, center, base_radius=30, cluster_colors=None):
+        """Draw separate colored rings for each post-it with spacing between them"""
+        x, y = center
+        
+        # Define default colors if no cluster colors provided
+        if not cluster_colors or len(cluster_colors) == 0:
+            cluster_colors = ['purple']  # Default
+        
+        # Ring properties
+        ring_thickness = 8  # Thickness of each ring
+        ring_spacing = 15   # Space between rings
+        
+        # Draw rings from inside to outside, one for each post-it
+        for i, color in enumerate(cluster_colors):
+            # Calculate radius for this ring (starting from center and moving outward)
+            ring_radius = base_radius + (i * ring_spacing)
+            
+            # Determine color (BGR format for OpenCV)
+            if color == 'pink':
+                ring_color = (255, 0, 255)    # Magenta for pink post-its
+            elif color == 'yellow':
+                ring_color = (0, 255, 255)    # Cyan for yellow post-its
+            elif color == 'blue':
+                ring_color = (255, 0, 0)      # Blue for blue post-its
+            elif color == 'green':
+                ring_color = (0, 255, 0)      # Green for green post-its
+            else:
+                ring_color = (147, 20, 255)   # Default purple
+            
+            # Draw the ring (hollow circle)
+            cv2.circle(canvas, (x, y), ring_radius, ring_color, ring_thickness)
+        
+        # Draw a small center dot to mark the cluster center
+        cv2.circle(canvas, (x, y), 5, (255, 255, 255), -1)  # White center dot
+    
     def create_canvas(self, detected_objects, frame_shape):
         canvas = np.zeros((frame_shape[0], frame_shape[1], 3), dtype=np.uint8)
         
@@ -514,24 +564,31 @@ class AugmentedCanvas:
             
             # Connection lines removed - flowers now appear without connecting lines
             
-            # Then draw one flower per cluster
+            # Draw visualization based on selected design style
             for cluster in clusters:
                 cluster_center = self.calculate_cluster_center(cluster)
-                petal_count = len(cluster)  # Number of petals = number of post-its in cluster
-                
-                # Calculate flower size based on cluster size
-                base_size = 25
-                flower_size = min(base_size + (petal_count - 1) * 5, self.max_flower_size)
+                cluster_size = len(cluster)  # Number of post-its in cluster
                 
                 # Collect colors from all post-its in this cluster
                 cluster_colors = [postit['color'] for postit in cluster]
                 
-                # Draw flower at cluster center with cluster colors
-                self.draw_flower(canvas, cluster_center, flower_size, petal_count, cluster_colors)
+                if self.design_style == 'rings':
+                    # Calculate ring radius based on cluster size
+                    base_radius = min(30 + (cluster_size - 1) * 10, 80)
+                    self.draw_rings(canvas, cluster_center, base_radius, cluster_colors)
+                else:  # default to flowers
+                    # Calculate flower size based on cluster size
+                    base_size = 25
+                    flower_size = min(base_size + (cluster_size - 1) * 5, self.max_flower_size)
+                    self.draw_flower(canvas, cluster_center, flower_size, cluster_size, cluster_colors)
                 
                 # Debug: show cluster info if debug mode is on
                 if self.show_debug:
-                    cv2.putText(canvas, f"{petal_count}p (size:{flower_size})", (cluster_center[0] + 20, cluster_center[1]), 
+                    if self.design_style == 'rings':
+                        debug_text = f"{cluster_size}r (rad:{base_radius})"
+                    else:
+                        debug_text = f"{cluster_size}p (size:{flower_size})"
+                    cv2.putText(canvas, debug_text, (cluster_center[0] + 20, cluster_center[1]), 
                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
             
             # Debug: show all pairwise distances between post-its
