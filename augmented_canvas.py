@@ -495,22 +495,7 @@ class AugmentedCanvas:
                     cv2.putText(canvas, f"C{i}: {len(cluster)} post-its", (10, 90 + i*25), 
                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
             
-            # First, draw connection lines within each cluster
-            for cluster in clusters:
-                if len(cluster) > 1:  # Only draw connections for multi-post-it clusters
-                    for i, obj1 in enumerate(cluster):
-                        for obj2 in cluster[i+1:]:
-                            # Draw connection line
-                            cv2.line(canvas, obj1['center'], obj2['center'], 
-                                   (100, 100, 100), 1)  # Gray connection line
-                            
-                            # Debug: show distance and threshold if debug mode is on
-                            if self.show_debug:
-                                distance = self.calculate_distance(obj1['center'], obj2['center'])
-                                mid_x = (obj1['center'][0] + obj2['center'][0]) // 2
-                                mid_y = (obj1['center'][1] + obj2['center'][1]) // 2
-                                cv2.putText(canvas, f"{int(distance)}/{self.proximity_threshold}", (mid_x, mid_y), 
-                                           cv2.FONT_HERSHEY_SIMPLEX, 0.3, (255, 255, 0), 1)
+            # Connection lines removed - flowers now appear without connecting lines
             
             # Then draw one flower per cluster
             for cluster in clusters:
