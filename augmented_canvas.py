@@ -434,25 +434,25 @@ class AugmentedCanvas:
     def draw_flower(self, canvas, center, size=20, petal_count=1, cluster_colors=None):
         x, y = center
         
-        # Define colors (BGR format for OpenCV)
-        if cluster_colors and len(cluster_colors) > 0:
-            # Use the most common post-it color in the cluster for petals
-            most_common_color = max(set(cluster_colors), key=cluster_colors.count)
-            if most_common_color == 'pink':
-                petal_color = (255, 0, 255)    # Magenta for pink post-its
-            elif most_common_color == 'yellow':
-                petal_color = (0, 255, 255)    # Cyan for yellow post-its
-            elif most_common_color == 'blue':
-                petal_color = (255, 0, 0)      # Blue for blue post-its
-            elif most_common_color == 'green':
-                petal_color = (0, 255, 0)      # Green for green post-its
-            else:
-                petal_color = (147, 20, 255)   # Default purple
-        else:
-            petal_color = (147, 20, 255)       # Default purple petals
+        # Define default colors if no cluster colors provided
+        if not cluster_colors or len(cluster_colors) == 0:
+            cluster_colors = ['purple'] * petal_count  # Default
             
         center_color = (0, 255, 255)    # Yellow center  
         stem_color = (0, 255, 0)        # Green stem
+        
+        def get_petal_color(color):
+            """Convert post-it color name to BGR color for petals"""
+            if color == 'pink':
+                return (255, 0, 255)    # Magenta for pink post-its
+            elif color == 'yellow':
+                return (0, 255, 255)    # Cyan for yellow post-its
+            elif color == 'blue':
+                return (255, 0, 0)      # Blue for blue post-its
+            elif color == 'green':
+                return (0, 255, 0)      # Green for green post-its
+            else:
+                return (147, 20, 255)   # Default purple
         
         # Ensure at least 1 petal, maximum 12 petals
         petal_count = max(1, min(petal_count, 12))
@@ -480,7 +480,11 @@ class AugmentedCanvas:
             # For 5+ petals, make them larger to be more visible
             petal_size = max(size//3, 12)
         
-        for petal_x, petal_y in petal_positions:
+        # Draw each petal with its corresponding post-it color
+        for i, (petal_x, petal_y) in enumerate(petal_positions):
+            # Get color for this specific petal (cycle through cluster colors if needed)
+            color_index = i % len(cluster_colors)
+            petal_color = get_petal_color(cluster_colors[color_index])
             cv2.circle(canvas, (petal_x, petal_y), petal_size, petal_color, -1)
         
         # Flower center (keep smaller so it doesn't cover petals)
