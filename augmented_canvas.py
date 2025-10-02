@@ -438,21 +438,21 @@ class AugmentedCanvas:
         if not cluster_colors or len(cluster_colors) == 0:
             cluster_colors = ['purple'] * petal_count  # Default
             
-        center_color = (0, 255, 255)    # Yellow center  
-        stem_color = (0, 255, 0)        # Green stem
+        center_color = (0, 150, 200)    # Dark orange center (more visible than yellow)
+        stem_color = (50, 150, 50)      # Dark green stem
         
         def get_petal_color(color):
             """Convert post-it color name to BGR color for petals"""
             if color == 'pink':
-                return (255, 0, 255)    # Magenta for pink post-its
+                return (180, 20, 220)   # Dark magenta for pink post-its
             elif color == 'yellow':
-                return (0, 255, 255)    # Cyan for yellow post-its
+                return (0, 140, 200)    # Dark orange for yellow post-its
             elif color == 'blue':
-                return (255, 0, 0)      # Blue for blue post-its
+                return (200, 50, 50)    # Dark blue for blue post-its
             elif color == 'green':
-                return (0, 255, 0)      # Green for green post-its
+                return (50, 150, 50)    # Dark green for green post-its
             else:
-                return (147, 20, 255)   # Default purple
+                return (120, 20, 180)   # Dark purple
         
         # Ensure at least 1 petal, maximum 12 petals
         petal_count = max(1, min(petal_count, 12))
@@ -514,15 +514,15 @@ class AugmentedCanvas:
             
             # Determine color (BGR format for OpenCV)
             if color == 'pink':
-                ring_color = (255, 0, 255)    # Magenta for pink post-its
+                ring_color = (180, 20, 220)   # Dark magenta for pink post-its
             elif color == 'yellow':
-                ring_color = (0, 255, 255)    # Cyan for yellow post-its
+                ring_color = (0, 140, 200)    # Dark orange for yellow post-its
             elif color == 'blue':
-                ring_color = (255, 0, 0)      # Blue for blue post-its
+                ring_color = (200, 50, 50)    # Dark blue for blue post-its
             elif color == 'green':
-                ring_color = (0, 255, 0)      # Green for green post-its
+                ring_color = (50, 150, 50)    # Dark green for green post-its
             else:
-                ring_color = (147, 20, 255)   # Default purple
+                ring_color = (120, 20, 180)   # Dark purple
             
             # Draw the ring (hollow circle)
             cv2.circle(canvas, (x, y), ring_radius, ring_color, ring_thickness)
@@ -559,32 +559,42 @@ class AugmentedCanvas:
             if obj['type'] == 'postit':
                 color_counts[obj['color']] += 1
         
-        # Display color counts in bottom-left corner (small)
+        # Display color counts in bottom-left corner (improved readability)
         start_x = 20
-        start_y = frame_shape[0] - 100  # Start from bottom and work up
+        start_y = frame_shape[0] - 120  # Start from bottom and work up
         y_offset = 0
         
         for color, count in color_counts.items():
             if count > 0:  # Only show colors that have post-its
                 # Determine display color (BGR format for OpenCV)
                 if color == 'pink':
-                    text_color = (255, 0, 255)    # Magenta
+                    text_color = (180, 20, 220)   # Dark magenta
                 elif color == 'yellow':
-                    text_color = (0, 255, 255)    # Cyan
+                    text_color = (0, 140, 200)    # Dark orange
                 elif color == 'blue':
-                    text_color = (255, 0, 0)      # Blue
+                    text_color = (200, 50, 50)    # Dark blue
                 elif color == 'green':
-                    text_color = (0, 255, 0)      # Green
+                    text_color = (50, 150, 50)    # Dark green
                 else:
                     text_color = (0, 0, 0)        # Black
                 
-                # Draw small colored circle and count
-                circle_x = start_x
+                # Draw larger colored circle and count with better readability
+                circle_x = start_x + 10
                 circle_y = start_y + y_offset
-                cv2.circle(canvas, (circle_x, circle_y), 6, text_color, -1)
-                cv2.putText(canvas, f"{count}", (circle_x + 15, circle_y + 5), 
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, text_color, 1)
-                y_offset += 20
+                cv2.circle(canvas, (circle_x, circle_y), 8, text_color, -1)
+                
+                # Draw text with white outline for better readability
+                text_x = circle_x + 25
+                text_y = circle_y + 7
+                # White outline (drawn first, slightly offset in all directions)
+                cv2.putText(canvas, f"{count}", (text_x-1, text_y-1), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+                cv2.putText(canvas, f"{count}", (text_x+1, text_y-1), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+                cv2.putText(canvas, f"{count}", (text_x-1, text_y+1), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+                cv2.putText(canvas, f"{count}", (text_x+1, text_y+1), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+                # Main text (drawn on top)
+                cv2.putText(canvas, f"{count}", (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.8, text_color, 2)
+                
+                y_offset += 30
         
         # Show flowers/rings if timer is running or has expired
         if self.is_running or self.timer_expired:
@@ -831,15 +841,15 @@ def main():
             x, y, w, h = obj['bbox']
             # Color code the bounding boxes based on post-it color
             if obj['color'] == 'pink':
-                box_color = (255, 0, 255)  # Magenta for pink
+                box_color = (180, 20, 220)   # Dark magenta for pink
             elif obj['color'] == 'yellow':
-                box_color = (0, 255, 255)  # Cyan for yellow
+                box_color = (0, 140, 200)    # Dark orange for yellow
             elif obj['color'] == 'blue':
-                box_color = (255, 0, 0)    # Blue
+                box_color = (200, 50, 50)    # Dark blue
             elif obj['color'] == 'green':
-                box_color = (0, 255, 0)    # Green
+                box_color = (50, 150, 50)    # Dark green
             else:
-                box_color = (255, 255, 255)  # White default
+                box_color = (128, 128, 128)  # Gray default
             
             cv2.rectangle(camera_display, (x, y), (x+w, y+h), box_color, 2)
             # Add color label
