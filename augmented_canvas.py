@@ -524,17 +524,17 @@ class AugmentedCanvas:
             cv2.circle(canvas, (x, y), ring_radius, ring_color, ring_thickness)
         
         # Draw a small center dot to mark the cluster center
-        cv2.circle(canvas, (x, y), 5, (255, 255, 255), -1)  # White center dot
+        cv2.circle(canvas, (x, y), 5, (0, 0, 0), -1)  # Black center dot
     
     def create_canvas(self, detected_objects, frame_shape):
-        canvas = np.zeros((frame_shape[0], frame_shape[1], 3), dtype=np.uint8)
+        canvas = np.ones((frame_shape[0], frame_shape[1], 3), dtype=np.uint8) * 255  # White background
         
         # Display question at top center if available
         if self.question:
             text_size = cv2.getTextSize(self.question, cv2.FONT_HERSHEY_SIMPLEX, 0.8, 2)[0]
             text_x = (frame_shape[1] - text_size[0]) // 2
             cv2.putText(canvas, self.question, (text_x, 40), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 2)
         
         # Display timer or discussion message
         if self.is_running and not self.timer_expired:
@@ -572,7 +572,7 @@ class AugmentedCanvas:
                 elif color == 'green':
                     text_color = (0, 255, 0)      # Green
                 else:
-                    text_color = (255, 255, 255)  # White
+                    text_color = (0, 0, 0)        # Black
                 
                 # Draw small colored circle and count
                 circle_x = start_x
@@ -590,10 +590,10 @@ class AugmentedCanvas:
             # Debug: show clustering info
             if self.show_debug:
                 cv2.putText(canvas, f"Clusters: {len(clusters)}", (10, 60), 
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
                 for i, cluster in enumerate(clusters):
                     cv2.putText(canvas, f"C{i}: {len(cluster)} post-its", (10, 90 + i*25), 
-                               cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
             
             # Connection lines removed - flowers now appear without connecting lines
             
@@ -622,7 +622,7 @@ class AugmentedCanvas:
                     else:
                         debug_text = f"{cluster_size}p (size:{flower_size})"
                     cv2.putText(canvas, debug_text, (cluster_center[0] + 20, cluster_center[1]), 
-                               cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
             
             # Debug: show all pairwise distances between post-its
             if self.show_debug:
