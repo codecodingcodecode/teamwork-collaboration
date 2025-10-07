@@ -19,6 +19,37 @@ class AugmentedCanvas:
         self.show_debug = False
         self.fullscreen = False
         self.design_style = 'flowers'  # 'flowers' or 'rings'
+        self.camera_zoom = 1.0          # Camera zoom factor (1.0 = normal size)
+        self.show_instructions = True   # Show instructions at start and when toggled
+        
+    def apply_camera_zoom(self, frame):
+        """Apply zoom to camera frame by cropping center and scaling back to original size"""
+        if self.camera_zoom == 1.0:
+            return frame
+        
+        height, width = frame.shape[:2]
+        
+        # Calculate crop dimensions (smaller crop = more zoom)
+        crop_width = int(width / self.camera_zoom)
+        crop_height = int(height / self.camera_zoom)
+        
+        # Calculate crop center coordinates
+        center_x = width // 2
+        center_y = height // 2
+        
+        # Calculate crop boundaries
+        start_x = max(0, center_x - crop_width // 2)
+        end_x = min(width, start_x + crop_width)
+        start_y = max(0, center_y - crop_height // 2)
+        end_y = min(height, start_y + crop_height)
+        
+        # Crop the frame
+        cropped = frame[start_y:end_y, start_x:end_x]
+        
+        # Scale back to original size
+        zoomed = cv2.resize(cropped, (width, height), interpolation=cv2.INTER_LINEAR)
+        
+        return zoomed
         
     def detect_postit_objects(self, color_frame):
         # Convert BGR to HSV for better color detection
@@ -368,28 +399,48 @@ class AugmentedCanvas:
     
     def get_user_input(self):
         """Get question, timer duration, and design style from user via console"""
-        print("\n=== Augmented Canvas Setup ===")
+        print("\n" + "="*60)
+        print("🌸 COLLABORATIVE BRAINSTORMING TOOL SETUP 🌸")
+        print("="*60)
+        print("This tool helps teams brainstorm with structured workflow:")
+        print("- Silent individual brainstorming with colored post-its")
+        print("- Visual clustering to show idea diversity and connections")
+        print("- Different colors represent different team members")
+        print("- Flowers/rings visualize how ideas cluster together")
+        print("-"*60)
         
         try:
             # Get question
-            question = input("Enter your question: ").strip()
+            print("\n📋 STEP 1: Define your brainstorming question")
+            print("Examples:")
+            print("  'How can we improve our product?'")
+            print("  'What are the main challenges we face?'")
+            print("  'Ideas for our next team event?'")
+            question = input("\n💭 Enter your brainstorming question/topic: ").strip()
             if not question:
-                print("No question entered. Using default.")
+                print("⚠️  No question entered. Using default.")
                 question = "What do you think about this?"
                 
             # Get timer duration
-            timer_input = input("Enter timer duration in seconds (default 60): ").strip()
+            print("\n⏱️  STEP 2: Set silent brainstorming duration")
+            print("This is the time each person writes ideas individually")
+            print("Recommended: 3-5 minutes (180-300 seconds) for focused sessions")
+            print("            5-10 minutes (300-600 seconds) for complex topics")
+            timer_input = input("\n⏰ Enter duration in seconds (default 300 = 5min): ").strip()
             try:
-                timer_duration = int(timer_input) if timer_input else 60
+                timer_duration = int(timer_input) if timer_input else 300
             except ValueError:
-                print("Invalid timer input, using default 60 seconds")
-                timer_duration = 60
+                print("⚠️  Invalid input, using default 300 seconds (5 minutes)")
+                timer_duration = 300
                 
             # Get design style
-            print("\nDesign styles:")
-            print("1. Flowers (petals represent clustered post-its)")
-            print("2. Rings (concentric rings represent clustered post-its)")
-            design_input = input("Choose design style (1 for flowers, 2 for rings, default 1): ").strip()
+            print("\n🎨 STEP 3: Choose visualization style")
+            print("Both styles show idea diversity and clustering:")
+            print("1. 🌸 Flowers: Petals = individual ideas, colors = contributors")
+            print("   More petals = more diverse ideas in this cluster")
+            print("2. ⭕ Rings: Concentric rings = individual ideas, colors = contributors")
+            print("   More rings = more diverse ideas in this cluster")
+            design_input = input("\nChoose style (1 for flowers, 2 for rings, default 1): ").strip()
             if design_input == "2":
                 design_style = 'rings'
             else:
@@ -399,15 +450,24 @@ class AugmentedCanvas:
             # If running in environment without interactive input, use defaults
             print("Using default values...")
             question = "What do you think about this?"
-            timer_duration = 60
+            timer_duration = 300
             design_style = 'flowers'
             
         self.question = question
         self.timer_duration = timer_duration
         self.design_style = design_style
-        print(f"Question: {self.question}")
-        print(f"Timer: {self.timer_duration} seconds")
-        print(f"Design: {self.design_style}")
+        
+        print("\n" + "="*60)
+        print("✅ SETUP COMPLETE!")
+        print(f"📝 Question: {self.question}")
+        print(f"⏱️  Timer: {self.timer_duration} seconds ({self.timer_duration//60}:{self.timer_duration%60:02d})")
+        print(f"🎨 Style: {self.design_style}")
+        print("\n🎯 NEXT STEPS:")
+        print("1. Prepare colored post-its for each team member")
+        print("2. Position camera to see the brainstorming area")
+        print("3. Press SPACE when ready to start silent brainstorming")
+        print("4. Use 'I' key to toggle workflow guide anytime")
+        print("="*60)
         return True
     
     def start_timer(self):
@@ -532,11 +592,12 @@ class AugmentedCanvas:
     
     def create_canvas(self, detected_objects, frame_shape):
         canvas = np.ones((frame_shape[0], frame_shape[1], 3), dtype=np.uint8) * 255  # White background
+        canvas_height, canvas_width = frame_shape[0], frame_shape[1]
         
         # Display question at top center if available
         if self.question:
             text_size = cv2.getTextSize(self.question, cv2.FONT_HERSHEY_SIMPLEX, 0.8, 2)[0]
-            text_x = (frame_shape[1] - text_size[0]) // 2
+            text_x = (canvas_width - text_size[0]) // 2
             cv2.putText(canvas, self.question, (text_x, 40), 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 2)
         
@@ -544,13 +605,11 @@ class AugmentedCanvas:
         if self.is_running and not self.timer_expired:
             remaining = self.get_remaining_time()
             timer_text = f"Time: {int(remaining)}s"
-            cv2.putText(canvas, timer_text, (frame_shape[1] - 150, 30), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+            cv2.putText(canvas, timer_text, (canvas_width - 150, 30), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
         elif self.timer_expired:
             discussion_text = "Start Discussing!"
-            text_size = cv2.getTextSize(discussion_text, cv2.FONT_HERSHEY_SIMPLEX, 1.2, 3)[0]
-            text_x = (frame_shape[1] - text_size[0]) // 2
-            cv2.putText(canvas, discussion_text, (text_x, frame_shape[0] // 2), 
+            cv2.putText(canvas, discussion_text, (20, 80), 
                        cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 0), 3)
         
         # Count post-its by color for display
@@ -559,9 +618,9 @@ class AugmentedCanvas:
             if obj['type'] == 'postit':
                 color_counts[obj['color']] += 1
         
-        # Display color counts in bottom-left corner (improved readability)
-        start_x = 20
-        start_y = frame_shape[0] - 120  # Start from bottom and work up
+        # Display color counts in bottom-left corner (much bigger)
+        start_x = 30
+        start_y = canvas_height - 160  # Start from bottom and work up
         y_offset = 0
         
         for color, count in color_counts.items():
@@ -578,23 +637,23 @@ class AugmentedCanvas:
                 else:
                     text_color = (0, 0, 0)        # Black
                 
-                # Draw larger colored circle and count with better readability
-                circle_x = start_x + 10
+                # Draw much larger colored circle and count
+                circle_x = start_x + 20
                 circle_y = start_y + y_offset
-                cv2.circle(canvas, (circle_x, circle_y), 8, text_color, -1)
+                cv2.circle(canvas, (circle_x, circle_y), 15, text_color, -1)  # Bigger circle
                 
-                # Draw text with white outline for better readability
-                text_x = circle_x + 25
-                text_y = circle_y + 7
+                # Draw much larger text with white outline for better readability
+                text_x = circle_x + 45
+                text_y = circle_y + 12
                 # White outline (drawn first, slightly offset in all directions)
-                cv2.putText(canvas, f"{count}", (text_x-1, text_y-1), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
-                cv2.putText(canvas, f"{count}", (text_x+1, text_y-1), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
-                cv2.putText(canvas, f"{count}", (text_x-1, text_y+1), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
-                cv2.putText(canvas, f"{count}", (text_x+1, text_y+1), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+                cv2.putText(canvas, f"{count}", (text_x-2, text_y-2), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 255, 255), 3)
+                cv2.putText(canvas, f"{count}", (text_x+2, text_y-2), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 255, 255), 3)
+                cv2.putText(canvas, f"{count}", (text_x-2, text_y+2), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 255, 255), 3)
+                cv2.putText(canvas, f"{count}", (text_x+2, text_y+2), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 255, 255), 3)
                 # Main text (drawn on top)
-                cv2.putText(canvas, f"{count}", (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.8, text_color, 2)
+                cv2.putText(canvas, f"{count}", (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 1.5, text_color, 3)
                 
-                y_offset += 30
+                y_offset += 50  # More spacing for bigger text
         
         # Show flowers/rings if timer is running or has expired
         if self.is_running or self.timer_expired:
@@ -650,12 +709,101 @@ class AugmentedCanvas:
                                    (10, y_offset), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 0), 1)
                         y_offset += 20
         
+        # Show workflow guide if enabled
+        if self.show_instructions:
+            if not self.is_running and not self.timer_expired:
+                # Before starting - show detailed workflow
+                guide = [
+                    "BRAINSTORMING WORKFLOW GUIDE",
+                    "",
+                    "PHASE 1: SILENT BRAINSTORMING",
+                    "- Each person uses different colored post-its",
+                    "- Write ONE idea per post-it",
+                    "- Work individually and quietly",
+                    "- Generate as many ideas as possible",
+                    "- Don't worry about quality yet",
+                    "",
+                    "PHASE 2: DISCUSSION & CLUSTERING",
+                    "- Share and explain your ideas",
+                    "- Move similar ideas close together",
+                    "- Group related concepts into clusters",
+                    "- Different colors = idea diversity",
+                    "",
+                    "VISUALIZATION:",
+                    "- Flowers/rings appear for each cluster",
+                    "- More petals/rings = more diverse ideas",
+                    "- Colors show who contributed what",
+                    "- Bigger clusters = more collaboration",
+                    "",
+                    "Ready? Press SPACE to start timer!"
+                ]
+            else:
+                # During/after timer - show clustering info
+                guide = [
+                    "CLUSTERING PHASE ACTIVE",
+                    "",
+                    "HOW TO CLUSTER:",
+                    "- Move similar post-its physically together",
+                    "- Each cluster will show as flower/ring",
+                    "- Colors represent different contributors",
+                    "- More ideas in cluster = bigger visualization",
+                    "",
+                    "WHAT THIS SHOWS:",
+                    "- Idea diversity within teams",
+                    "- How concepts naturally group",
+                    "- Individual vs. collaborative thinking",
+                    "- Visual map of brainstorming results",
+                    "",
+                    "CONTROLS:",
+                    "I = Toggle this guide",
+                    "+/= = Zoom in camera",
+                    "- = Zoom out camera", 
+                    "R = Reset zoom to 1.0x",
+                    "ESC = Exit session",
+                    "D = Debug mode"
+                ]
+            
+            # Larger semi-transparent background for guide
+            inst_x = canvas_width - 450
+            inst_y = 20
+            inst_height = len([g for g in guide if g != ""]) * 26 + 60
+            overlay = canvas.copy()
+            cv2.rectangle(overlay, (inst_x - 25, inst_y - 15), 
+                         (canvas_width - 10, inst_y + inst_height), (245, 245, 245), -1)
+            cv2.addWeighted(overlay, 0.9, canvas, 0.1, 0, canvas)
+            
+            # Draw border
+            cv2.rectangle(canvas, (inst_x - 25, inst_y - 15), 
+                         (canvas_width - 10, inst_y + inst_height), (200, 200, 200), 2)
+            
+            # Draw guide text with better formatting
+            text_y = inst_y + 10
+            for instruction in guide:
+                if instruction == "":  # Empty line
+                    text_y += 15
+                    continue
+                    
+                # Main headers
+                if instruction.isupper() and ":" not in instruction:
+                    cv2.putText(canvas, instruction, (inst_x, text_y), 
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 0, 0), 2)
+                # Section headers  
+                elif instruction.startswith("PHASE") or instruction.endswith(":"):
+                    cv2.putText(canvas, instruction, (inst_x, text_y), 
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.55, (50, 50, 150), 2)
+                # Regular text
+                else:
+                    cv2.putText(canvas, instruction, (inst_x, text_y), 
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
+                
+                text_y += 26
+        
         # Show start button if not running
         if not self.is_running:
             button_text = "Press SPACE to Start"
             text_size = cv2.getTextSize(button_text, cv2.FONT_HERSHEY_SIMPLEX, 1, 2)[0]
-            button_x = (frame_shape[1] - text_size[0]) // 2
-            button_y = frame_shape[0] // 2 + 50
+            button_x = (canvas_width - text_size[0]) // 2
+            button_y = canvas_height // 2 + 50
             
             # Draw button background
             cv2.rectangle(canvas, (button_x - 20, button_y - 30), 
@@ -666,7 +814,7 @@ class AugmentedCanvas:
         # Show stop button in bottom right if running
         if self.is_running:
             stop_text = "ESC to Stop"
-            cv2.putText(canvas, stop_text, (frame_shape[1] - 120, frame_shape[0] - 20), 
+            cv2.putText(canvas, stop_text, (canvas_width - 120, canvas_height - 20), 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
         
         return canvas
@@ -781,7 +929,11 @@ def main():
     print("Controls:")
     print("- SPACE: Start timer and visualization")
     print("- ESC: Stop and exit")
+    print("- I: Toggle workflow guide")
     print("- D: Toggle debug mode (show color detection masks)")
+    print("- +/=: Zoom in camera")
+    print("- -: Zoom out camera")
+    print("- R: Reset camera zoom to 1.0x")
     print("- Q: Quit")
     
     camera_window = 'Camera Feed'
@@ -818,6 +970,9 @@ def main():
             continue
         else:
             failed_reads = 0  # Reset counter on successful read
+        
+        # Apply camera zoom to the frame
+        frame = augmented_canvas.apply_camera_zoom(frame)
         
         # Detect post-it objects in the frame (using color frame instead of gray)
         detected_objects = augmented_canvas.detect_postit_objects(frame)
@@ -898,11 +1053,23 @@ def main():
         elif key == 27:  # ESC key
             if augmented_canvas.is_running:
                 break  # Stop and exit
+        elif key == ord('i'):  # I key for workflow guide
+            augmented_canvas.show_instructions = not augmented_canvas.show_instructions
+            print(f"Workflow guide: {'ON' if augmented_canvas.show_instructions else 'OFF'}")
         elif key == ord('d'):  # D key for debug
             augmented_canvas.show_debug = not augmented_canvas.show_debug
             if not augmented_canvas.show_debug:
                 cv2.destroyWindow("Color Debug")
             print(f"Debug mode: {'ON' if augmented_canvas.show_debug else 'OFF'}")
+        elif key == ord('+') or key == ord('='):  # Plus key for zoom in
+            augmented_canvas.camera_zoom = min(5.0, augmented_canvas.camera_zoom + 0.2)
+            print(f"Camera Zoom: {augmented_canvas.camera_zoom:.1f}x")
+        elif key == ord('-'):  # Minus key for zoom out
+            augmented_canvas.camera_zoom = max(1.0, augmented_canvas.camera_zoom - 0.2)
+            print(f"Camera Zoom: {augmented_canvas.camera_zoom:.1f}x")
+        elif key == ord('r'):  # R key to reset zoom
+            augmented_canvas.camera_zoom = 1.0
+            print("Camera zoom reset to 1.0x")
         
         # Check if timer expired (but don't close, just update state)
         if augmented_canvas.is_running and augmented_canvas.is_timer_expired():
