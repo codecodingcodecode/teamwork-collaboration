@@ -596,21 +596,22 @@ class AugmentedCanvas:
         
         # Display question at top center if available
         if self.question:
-            text_size = cv2.getTextSize(self.question, cv2.FONT_HERSHEY_SIMPLEX, 0.8, 2)[0]
+            text_size = cv2.getTextSize(self.question, cv2.FONT_HERSHEY_SIMPLEX, 1.5, 3)[0]
             text_x = (canvas_width - text_size[0]) // 2
-            cv2.putText(canvas, self.question, (text_x, 40), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 2)
+            cv2.putText(canvas, self.question, (text_x, 60), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 0), 3)
         
         # Display timer or discussion message
         if self.is_running and not self.timer_expired:
             remaining = self.get_remaining_time()
             timer_text = f"Time: {int(remaining)}s"
-            cv2.putText(canvas, timer_text, (canvas_width - 150, 30), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
+            timer_size = cv2.getTextSize(timer_text, cv2.FONT_HERSHEY_SIMPLEX, 1.5, 3)[0]
+            cv2.putText(canvas, timer_text, (canvas_width - timer_size[0] - 20, 60), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 0), 3)
         elif self.timer_expired:
             discussion_text = "Start Discussing!"
-            cv2.putText(canvas, discussion_text, (20, 80), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 0), 3)
+            cv2.putText(canvas, discussion_text, (20, 120), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 255, 0), 3)
         
         # Count post-its by color for display
         color_counts = {'pink': 0, 'yellow': 0, 'blue': 0, 'green': 0}
